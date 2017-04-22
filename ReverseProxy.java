@@ -12,9 +12,51 @@ public class ReverseProxy {
     }
 
     ArrayList<InfoServer> table;
-  
+
+    static class ReceiveNotify extends Thread {
+
+        private DatagramSocket socket;
+        private InetAddress ip;
+        private byte[] receiveData;
+        private DatagramPacket receive;
+        boolean running;
+
+        public ReceiveNotify (String ip, DatagramSocket socket){
+                this.socket = socket;
+                try{
+                        this.ip = InetAddress.getByName(ip);
+                } catch( Exception e) {
+                        e.printStackTrace();
+                }
+                receiveData = new byte [64];
+                running = true;
+        }
+
+        @Override
+        public void run() {
+                receive = new DatagramPacket(receiveData, receiveData.length);
+                while(running){
+                        try {
+                                synchronized(socket) {
+                                        socket.receive(receive);
+                                }
+                        String notify = new String(receive.getData());
+                        System.out.println("R:. " + notify);
+                        } catch( Exception e){
+                                e.printStackTrace();
+                        }
+                }
+        }
+
+        public void stopCycle() {
+                running = false;
+                socket.close();
+        }
+
+    }
+
     public static void main(String args[]) throws Exception {
-        
+
         DatagramSocket serverSocket = new DatagramSocket(5555);
         byte[] receiveData = new byte[1024];
         byte[] sendData = new byte[1024];
@@ -37,5 +79,4 @@ public class ReverseProxy {
             serverSocket.send(sendPacket);
         }
     }
-    
 }
