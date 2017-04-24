@@ -31,13 +31,11 @@ public class MonitorUDP {
                          sendData.length, ip, 5555);
             while(running) {
                 try {
-                    synchronized(socket){
-                            socket.send(sendPacket);
-                    }
-    
-                    } catch(Exception e){
-                                e.printStackTrace();
-                    }   
+                    socket.send(sendPacket);
+                    Thread.sleep(5000);
+                } catch(Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -50,39 +48,43 @@ public class MonitorUDP {
     }
 
     public static void main(String args[]) throws Exception {
-        DatagramSocket socket = new DatagramSocket();
+        DatagramSocket socket = new DatagramSocket(5555);
+        DatagramPacket receive;
+        DatagramPacket send;
+        InetAddress ipAddr;
+       	String notify = "Available";
+       	StringBuilder pdu = new StringBuilder();
         if(args.length < 1) {
             System.out.println("Need Server IP to run");
             return;
         }
-        byte[] receiveData = new byte[64];
+        byte[] receiveData = new byte[128];
         byte[] sendData = new byte[128];
+        int lastAck = 1;
 
         String ip = args[0];
+      	ipAddr = InetAddress.getByName(ip);  
         Thread notifier = new NotifyThread(ip, socket);
         notifier.start();
 
         while(true){
-                DatagramPacket receive = 
-                	new DatagramPacket( receiveData, receiveData.length);
-                
-                synchronized(socket){
-                        socket.receive(receive);
-                }
 
-                String request = 
-                	new String(receive.getData());
+      		 	receive = new DatagramPacket( receiveData, receiveData.length);               
+                
+                socket.receive(receive);
+
+                String request = new String(receive.getData());
                 
                 System.out.println("RECEIVED: " + request);
-                String response = "RESPONSE";
+             	
+             	pdu.append("ACK ").append(lastAck);
+
+                sendData = pdu.toString().getBytes();
+                send = new DatagramPacket(sendData, sendData.length, 
+                                          receive.getAddress(), 5555);
                 
-                sendData = response.getBytes();
-                DatagramPacket send = 
-                	new DatagramPacket( sendData, sendData.length, receive.getAddress(), 5555);
-                
-                synchronized(socket){
-                        socket.send(send);
-                }
+                socket.send(send);
+                pdu = new StringBuilder();
         }
     }
 }
