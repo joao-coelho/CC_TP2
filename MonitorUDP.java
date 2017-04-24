@@ -54,6 +54,8 @@ public class MonitorUDP {
         InetAddress ipAddr;
        	String notify = "Available";
        	StringBuilder pdu = new StringBuilder();
+        int nTcp;
+
         if(args.length < 1) {
             System.out.println("Need Server IP to run");
             return;
@@ -68,16 +70,26 @@ public class MonitorUDP {
         notifier.start();
 
         while(true){
+                StringBuilder cmd = new StringBuilder();
+                cmd.append("netstat --inet localhost --tcp | ");
+                cmd.append("grep ESTABLISHED | wc -l");
+                Process p = Runtime.getRuntime().exec(cmd.toString());
+                BufferedReader res = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                String tmp = res.readLine();
+                try {
+                    nTcp = Integer.parseInt(tmp);
+                } catch (NumberFormatException e) {
+                    nTcp = 0;
+                }
 
       		 	receive = new DatagramPacket( receiveData, receiveData.length);               
-                
                 socket.receive(receive);
-
                 String request = new String(receive.getData());
                 
                 System.out.println("RECEIVED: " + request);
              	
-             	pdu.append("ACK ").append(lastAck);
+             	pdu.append("ACK ").append(lastAck++);
+                pdu.append(" #TCP: " + nTcp);
 
                 sendData = pdu.toString().getBytes();
                 send = new DatagramPacket(sendData, sendData.length, 
