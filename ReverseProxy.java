@@ -37,102 +37,148 @@ class CheckTimeOut extends Thread {
     @Override
     public void run() {
            
-            while(running) {
-                double time, diff;
-                ArrayList<InetAddress> rm = new ArrayList<>();
-                
-                for(Map.Entry<InetAddress, InfoServer> entry : table.entrySet()) {
-                    InetAddress key = entry.getKey();
-                    InfoServer value = entry.getValue();
-                    time = Calendar.getInstance().getTimeInMillis();
-                    diff = time - value.lastReq.getTimeInMillis();
-                    
-                    if(diff > 20000) {
-                        String s = "Lost connection with ";
-                        System.out.println(s + key.toString());
-                        System.out.println("");
-                        rm.add(key);
-                    }
-                }
-                for(InetAddress ia : rm)
-                    table.remove(ia);
-                try {
-                    Thread.sleep(10000);
-                } catch(Exception e) {
-                    e.printStackTrace();
-                }
+        while(running) {
+            double time, diff;
+            ArrayList<InetAddress> rm = getTimedOut();
+            
+            for(InetAddress ia : rm)
+                table.remove(ia);
+            
+            try {
+                Thread.sleep(ReverseProxy.TIMECHK);
+            } catch(Exception e) {
+                e.printStackTrace();
             }
+        }
     }
 
-        public void stopCycle() {
-            running = false;
+    private ArrayList<InetAddress> getTimedOut() {
+        ArrayList<InetAddress> rm = new ArrayList<>();
+            
+        for(Map.Entry<InetAddress, InfoServer> entry : table.entrySet()) {
+            InetAddress key  = entry.getKey();
+            InfoServer value = entry.getValue();
+            time = Calendar.getInstance().getTimeInMillis();
+            diff = time  -  value.lastReq.getTimeInMillis();
+
+            if(diff > ReverseProxy.TIMEOUT) {
+                String s = "Lost connection with ";
+                System.out.println(s + key.toString());
+                System.out.println("");
+                rm.add(key);
+            }
         }
+        return rm;
+    }
+
+    public void stopCycle() {
+        running = false;
+    }
+}
+
+class Probing extends Thread {
+    HashMap<InetAddress,InfoServer> table;
+    boolean running;
+    DatagramSocket socket;
+    String request;
+    String response;
+    DatagramPacket send, receive;
+    InfoServer backEnd;
+    InetAddress addr;
+    byte[] receiveData;
+    byte[] sendData;
+
+    public Probing(HashMap<InetAddress,InfoServer> table) {
+        this.table = table;
+        try {
+            socket = new DatagramSocket(5555);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        running = true;
+        request = "Request Probing ";
+        receiveData = new byte[64];
+        sendData    = new byte[128];
+    }
+
+
+    @Override
+    public void run() {
+
+
+        while(running) {
+            receive = new DatagramPacket(receiveData, receiveData.length);
+            try {
+                socket.receive(receive);
+                String received = new String(receive.getData(), 0, 
+                                             receive.getLength());
+                addr = receive.getAddress();
+                System.out.println(received);
+
+                if(received.contains("Available"))
+                    sendProbing();
+                else {
+                    updateInfo(received);
+                }
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void sendProbing() throws Exception {
+        System.out.println("");
+
+        if(!table.containsKey(addr)) {
+            String s = "New connection: " + addr.toString();
+            System.out.println(s);
+            backEnd = new InfoServer();
+            table.put(addr, backEnd);
+        }
+        else
+            backEnd = table.get(addr);
+
+        sendData = (request + backEnd.env).getBytes();
+        send = new DatagramPacket(sendData, sendData.length, 
+                                  addr, 5555);
+        backEnd.lastReq = Calendar.getInstance();
+        backEnd.env++;
+        backEnd.updateLoss();
+        socket.send(send);
+    }
+
+    private void updateInfo(String received) throws Exception {
+        backEnd  = table.get(addr);
+        double i = backEnd.lastReq.getTimeInMillis();
+        double f = Calendar.getInstance().getTimeInMillis();
+        String s = received.split(" ")[3];
+        backEnd.rtt = (backEnd.rtt + (f - i))/2;
+        backEnd.rec++;
+        backEnd.updateLoss();
+        backEnd.nTcpCon = Integer.parseInt(s);
+
+        System.out.println("IP: " + addr.toString());
+        System.out.println("RTT: " + backEnd.rtt);
+        System.out.println("LossRate: " + backEnd.lossRate);
+        System.out.println("Tcp connections: " + backEnd.nTcpCon);
+        System.out.println("");
+    }
 }
 
 
-
 public class ReverseProxy {
-
+    public static final int TIMEOUT = 20000;
+    public static final int TIMECHK = 10000;
     
-    public static void main(String args[]) throws Exception {
+    public static void main(String args[]) {
 
         HashMap<InetAddress,InfoServer> table = new HashMap<>();
-        DatagramSocket socket = new DatagramSocket(5555);
-        DatagramPacket send;
-        byte[] sendData = new byte[128];
-        InetAddress addr;
-        DatagramPacket receive;
-        String request, response;
-        InfoServer backEnd;
-        request = "Request Probing ";
         Thread check = new CheckTimeOut(table);
+        Thread probn = new Probing(table);
         check.start();
+        probn.start();
 
-        while(true){
-            byte[] receiveData = new byte[64];
-            receive = new DatagramPacket(receiveData,
-                                    receiveData.length);
-            socket.receive(receive);
-            String received = new String(receive.getData(), 0, receive.getLength());
-            addr = receive.getAddress();
-            System.out.println(received);
+        //Check table and send packets via tcp
 
-            if(received.contains("Available")) {
-
-                System.out.println("");
-                
-                if(!table.containsKey(addr)) {
-                    System.out.println("New connection: " + addr.toString());
-                    backEnd = new InfoServer();
-                    table.put(addr, backEnd);
-                }
-                else
-                    backEnd = table.get(addr);
-
-                sendData = (request + backEnd.env).getBytes();
-                send = new DatagramPacket(sendData, sendData.length, addr, 5555);
-                backEnd.lastReq = Calendar.getInstance();
-                backEnd.env++;
-                backEnd.updateLoss();
-                socket.send(send);
-            }
-            else {
-                backEnd = table.get(addr);
-                double i = backEnd.lastReq.getTimeInMillis();
-                double f = Calendar.getInstance().getTimeInMillis();
-                String s = received.split(" ")[3];
-                backEnd.rtt = (backEnd.rtt + (f - i))/2;
-                backEnd.rec++;
-                backEnd.updateLoss();
-                backEnd.nTcpCon = Integer.parseInt(s);
-
-                System.out.println("IP: " + addr.toString());
-                System.out.println("RTT: " + backEnd.rtt);
-                System.out.println("LossRate: " + backEnd.lossRate);
-                System.out.println("Tcp connections: " + backEnd.nTcpCon);
-                System.out.println("");
-            }
-
-        }
     }
 }
