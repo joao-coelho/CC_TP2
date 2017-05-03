@@ -175,6 +175,18 @@ class TcpConnection extends Thread {
         this.table = table;
     }
 
+    @Override
+    public void run() {
+        for(Map.Entry<InetAddress, InfoServer> entry : table.entrySet()) {
+            InetAddress key  = entry.getKey();
+            InfoServer value = entry.getValue();
+            if(value.nTcpCon == 0) {
+                //Socket e siga
+            }
+        }
+
+    }
+
 }
 
 public class ReverseProxy {
@@ -182,7 +194,7 @@ public class ReverseProxy {
     public static final int TIMECHK = 10000;
     public static final int PORT = 80;
 
-    public static void main(String args[]) {
+    public static void main(String args[]) throws Exception {
 
         ServerSocket socket = new ServerSocket(PORT);
         Socket client;
@@ -191,14 +203,10 @@ public class ReverseProxy {
         Thread probn = new Probing(table);
         check.start();
         probn.start();
-        while((client = socket.accept())) {
+        while((client = socket.accept()) != null) {
             Thread tcpCon = new TcpConnection(client, table);
             tcpCon.start();
         }
-
-
-
-        //Check table and send packets via tcp
 
     }
 }
