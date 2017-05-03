@@ -166,17 +166,37 @@ class Probing extends Thread {
 }
 
 
+class TcpConnection extends Thread {
+    Socket client;
+    HashMap<InetAddress, InfoServer> table;
+
+    public TcpConnection(Socket client, HashMap<InetAddress, InfoServer> table) {
+        this.client = client;
+        this.table = table;
+    }
+
+}
+
 public class ReverseProxy {
     public static final int TIMEOUT = 20000;
     public static final int TIMECHK = 10000;
-    
+    public static final int PORT = 80;
+
     public static void main(String args[]) {
 
+        ServerSocket socket = new ServerSocket(PORT);
+        Socket client;
         HashMap<InetAddress,InfoServer> table = new HashMap<>();
         Thread check = new CheckTimeOut(table);
         Thread probn = new Probing(table);
         check.start();
         probn.start();
+        while((client = socket.accept())) {
+            Thread tcpCon = new TcpConnection(client, table);
+            tcpCon.start();
+        }
+
+
 
         //Check table and send packets via tcp
 
