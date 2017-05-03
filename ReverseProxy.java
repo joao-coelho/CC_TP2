@@ -38,7 +38,6 @@ class CheckTimeOut extends Thread {
     public void run() {
            
         while(running) {
-            double time, diff;
             ArrayList<InetAddress> rm = getTimedOut();
             
             for(InetAddress ia : rm)
@@ -54,6 +53,7 @@ class CheckTimeOut extends Thread {
 
     private ArrayList<InetAddress> getTimedOut() {
         ArrayList<InetAddress> rm = new ArrayList<>();
+        double time, diff;
             
         for(Map.Entry<InetAddress, InfoServer> entry : table.entrySet()) {
             InetAddress key  = entry.getKey();
