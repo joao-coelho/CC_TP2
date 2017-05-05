@@ -7,8 +7,8 @@ class InfoServer {
     protected double lossRate;
     protected int nTcpCon;
     protected int rec, env;
-    protected Calendar lastReq;
-
+    protected int dup;
+    protected Calendar lastProbing;
 
     public InfoServer() {
         rtt = 0.0;
@@ -59,7 +59,7 @@ class CheckTimeOut extends Thread {
             InetAddress key  = entry.getKey();
             InfoServer value = entry.getValue();
             time = Calendar.getInstance().getTimeInMillis();
-            diff = time  -  value.lastReq.getTimeInMillis();
+            diff = time  -  value.lastProbing.getTimeInMillis();
 
             if(diff > ReverseProxy.TIMEOUT) {
                 String s = "Lost connection with ";
@@ -97,14 +97,13 @@ class Probing extends Thread {
         }
         running = true;
         request = "Request Probing ";
-        receiveData = new byte[64];
+        receiveData = new byte[128];
         sendData    = new byte[128];
     }
 
 
     @Override
     public void run() {
-
 
         while(running) {
             receive = new DatagramPacket(receiveData, receiveData.length);
@@ -128,6 +127,7 @@ class Probing extends Thread {
 
     private void sendProbing() throws Exception {
         System.out.println("");
+        StringBuilder env = new StringBuilder();
 
         if(!table.containsKey(addr)) {
             String s = "New connection: " + addr.toString();
@@ -137,28 +137,33 @@ class Probing extends Thread {
         }
         else
             backEnd = table.get(addr);
-
-        sendData = (request + backEnd.env).getBytes();
+        Calendar c = Calendar.getInstance();
+        long time = c.getTimeInMillis();
+        env.append(request);
+        env.append(backEnd.env);
+        env.append(" ").append(time);
+        String cena = env.toString();
+        sendData = env.toString().getBytes();
         send = new DatagramPacket(sendData, sendData.length, 
                                   addr, 5555);
-        backEnd.lastReq = Calendar.getInstance();
+        backEnd.lastProbing = c;
         backEnd.env++;
         backEnd.updateLoss();
         socket.send(send);
     }
 
     private void updateInfo(String received) throws Exception {
+        String[] rec = received.split(" ");
         backEnd  = table.get(addr);
-        double i = backEnd.lastReq.getTimeInMillis();
-        double f = Calendar.getInstance().getTimeInMillis();
-        String s = received.split(" ")[3];
+        long i = Long.parseLong(rec[4]);
+        long f = Calendar.getInstance().getTimeInMillis();
         backEnd.rtt = (backEnd.rtt + (f - i))/2;
         backEnd.rec++;
         backEnd.updateLoss();
-        backEnd.nTcpCon = Integer.parseInt(s);
+        backEnd.nTcpCon = Integer.parseInt(rec[3]);
 
         System.out.println("IP: " + addr.toString());
-        System.out.println("RTT: " + backEnd.rtt);
+        System.out.printf ("RTT: %.2f ms\n", backEnd.rtt);
         System.out.println("LossRate: " + backEnd.lossRate);
         System.out.println("Tcp connections: " + backEnd.nTcpCon);
         System.out.println("");

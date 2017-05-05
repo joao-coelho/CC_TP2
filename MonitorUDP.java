@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.Calendar;
 
 class NotifyThread extends Thread {
 
@@ -70,7 +71,7 @@ public class MonitorUDP {
         Thread notifier = new NotifyThread(ip, socket);
         notifier.start();
 
-        while(true){     
+        while(true) {     
             cmd.append("netstat --inet localhost --tcp | ");
             cmd.append("grep ESTABLISHED | wc -l");
             Process p = Runtime.getRuntime().exec(cmd.toString());
@@ -87,12 +88,19 @@ public class MonitorUDP {
 
       		receive = new DatagramPacket(receiveData, receiveData.length);               
             socket.receive(receive);
-            String request = new String(receive.getData());
+            String request = new String(receive.getData(), 0, 
+                                        receive.getLength());
             System.out.println("RECEIVED: " + request);
+
+            String num = request.split(" ")[3];
+            long time  = Long.parseLong(num);
+            long tnow  = Calendar.getInstance().getTimeInMillis();
+            long diff  = tnow - time;
             
             pdu.append("ACK ").append(lastAck++);
-            pdu.append(" #TCP: " + nTcp);
-
+            pdu.append(" #TCP: " + nTcp + " ");
+            tnow = Calendar.getInstance().getTimeInMillis();
+            pdu.append(tnow - diff);
             sendData = pdu.toString().getBytes();
             send = new DatagramPacket(sendData, sendData.length, 
                                       receive.getAddress(), 5555);
