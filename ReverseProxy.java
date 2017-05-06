@@ -7,7 +7,7 @@ class InfoServer {
     protected double lossRate;
     protected int nTcpCon;
     protected int rec, env;
-    protected int dup;
+    protected int dup, lastAck;
     protected Calendar lastProbing;
 
     public InfoServer() {
@@ -18,7 +18,11 @@ class InfoServer {
     }
 
     public void updateLoss() {
-        lossRate = 1 - (double)rec/env;
+        double aux = (double)rec/env;
+        if(aux <= 1)
+            lossRate = 1 - aux;
+        else
+            lossRate = aux - 1;
     }
 
 }
@@ -109,7 +113,7 @@ class Probing extends Thread {
             receive = new DatagramPacket(receiveData, receiveData.length);
             try {
                 socket.receive(receive);
-                String received = new String(receive.getData(), 0, 
+                String received = new String(receive.getData(), receive.getOffset(), 
                                              receive.getLength());
                 addr = receive.getAddress();
                 System.out.println(received);
@@ -157,15 +161,21 @@ class Probing extends Thread {
         backEnd  = table.get(addr);
         long i = Long.parseLong(rec[4]);
         long f = Calendar.getInstance().getTimeInMillis();
+        int ac = Integer.parseInt(rec[1]);
         backEnd.rtt = (backEnd.rtt + (f - i))/2;
-        backEnd.rec++;
-        backEnd.updateLoss();
         backEnd.nTcpCon = Integer.parseInt(rec[3]);
+        if(ac == backEnd.lastAck)
+            backEnd.dup++;
+        else 
+            backEnd.rec++;
+        backEnd.updateLoss();
+        backEnd.lastAck = ac;
 
         System.out.println("IP: " + addr.toString());
         System.out.printf ("RTT: %.2f ms\n", backEnd.rtt);
         System.out.println("LossRate: " + backEnd.lossRate);
         System.out.println("Tcp connections: " + backEnd.nTcpCon);
+        System.out.println("Duplicated packets:" + backEnd.dup);
         System.out.println("");
     }
 }

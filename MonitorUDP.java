@@ -58,7 +58,6 @@ public class MonitorUDP {
         StringBuilder cmd  = new StringBuilder();
         byte[] receiveData = new byte[128];
         byte[] sendData    = new byte[128];
-        int lastAck = 1;
         int nTcp;
 
         if(args.length < 1) {
@@ -71,7 +70,7 @@ public class MonitorUDP {
         Thread notifier = new NotifyThread(ip, socket);
         notifier.start();
 
-        while(true) {     
+        while(true) {
             cmd.append("netstat --inet localhost --tcp | ");
             cmd.append("grep ESTABLISHED | wc -l");
             Process p = Runtime.getRuntime().exec(cmd.toString());
@@ -86,18 +85,20 @@ public class MonitorUDP {
                 nTcp = 0;
             }
 
-      		receive = new DatagramPacket(receiveData, receiveData.length);               
+      		receive = new DatagramPacket(receiveData, receiveData.length);
             socket.receive(receive);
-            String request = new String(receive.getData(), 0, 
+
+            String request = new String(receive.getData(), receive.getOffset(), 
                                         receive.getLength());
             System.out.println("RECEIVED: " + request);
 
+            int req = Integer.parseInt(request.split(" ")[2]);
             String num = request.split(" ")[3];
             long time  = Long.parseLong(num);
             long tnow  = Calendar.getInstance().getTimeInMillis();
             long diff  = tnow - time;
             
-            pdu.append("ACK ").append(lastAck++);
+            pdu.append("ACK ").append(req+1);
             pdu.append(" #TCP: " + nTcp + " ");
             tnow = Calendar.getInstance().getTimeInMillis();
             pdu.append(tnow - diff);
