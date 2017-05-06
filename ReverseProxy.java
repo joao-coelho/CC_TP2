@@ -117,7 +117,7 @@ class Probing extends Thread {
                 String received = new String(receive.getData(), receive.getOffset(), 
                                              receive.getLength());
                 addr = receive.getAddress();
-                System.out.println(received);
+                //System.out.println(received);
 
                 if(received.contains("Available"))
                     sendProbing(received.split(" ")[1]);
@@ -143,16 +143,17 @@ class Probing extends Thread {
         }
         else
             backEnd = table.get(addr);
+
         if(numb == backEnd.warn) {
             backEnd.dup++;
             return;
         }
+
         Calendar c = Calendar.getInstance();
         long time = c.getTimeInMillis();
         env.append(request);
         env.append(backEnd.env);
         env.append(" ").append(time);
-        String cena = env.toString();
         sendData = env.toString().getBytes();
         send = new DatagramPacket(sendData, sendData.length, 
                                   addr, 5555);
@@ -177,13 +178,53 @@ class Probing extends Thread {
             backEnd.rec++;
         backEnd.updateLoss();
         backEnd.lastAck = ac;
+        printTable();
 
-        System.out.println("IP: " + addr.toString());
+        /*System.out.println("IP: " + addr.toString());
         System.out.printf ("RTT: %.2f ms\n", backEnd.rtt);
-        System.out.println("LossRate: " + backEnd.lossRate);
+        System.out.printf ("LossRate: %.2f\n",backEnd.lossRate);
         System.out.println("Tcp connections: " + backEnd.nTcpCon);
         System.out.println("Duplicated packets:" + backEnd.dup);
-        System.out.println("");
+        System.out.println("");*/
+    }
+
+    private void printTable() {
+        System.out.print("\033[H\033[2J");  
+        System.out.flush();
+        System.out.printf("%15s", "IP");
+        System.out.printf("  |  ");
+        System.out.printf("%10s", "RTT(ms)");
+        System.out.printf("  |  ");
+        System.out.printf("%10s", "LossRate");
+        System.out.printf("  |  ");
+        System.out.printf("%10s", "NºTcpCon");
+        System.out.printf("  |  ");
+        System.out.printf("%10s", "NºDupPack");
+        System.out.printf("  |\n");
+        System.out.print("-----------------+");
+        System.out.print("--------------+");
+        System.out.print("--------------+");
+        System.out.print("--------------+");
+        System.out.print("--------------+\n");
+         for(Map.Entry<InetAddress, InfoServer> entry : table.entrySet()) {
+            InetAddress key  = entry.getKey();
+            InfoServer value = entry.getValue();
+            System.out.printf("%15s", key.toString());
+            System.out.printf("  |  ");
+            System.out.printf("%10f", value.rtt);
+            System.out.printf("  |  ");
+            System.out.printf("%10f", value.lossRate);
+            System.out.printf("  |  ");
+            System.out.printf("%10d", value.nTcpCon);
+            System.out.printf("  |  ");
+            System.out.printf("%10d", value.dup);
+            System.out.printf("  |\n");
+            System.out.print("-----------------+");
+            System.out.print("--------------+");
+            System.out.print("--------------+");
+            System.out.print("--------------+");
+            System.out.print("--------------+\n");
+        }
     }
 }
 
