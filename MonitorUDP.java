@@ -9,13 +9,12 @@ class NotifyThread extends Thread {
     private byte[] sendData;
     private DatagramPacket sendPacket;
     private boolean running;
+    private int nr;
 
     public NotifyThread(String ip, DatagramSocket socket) {
-        String sentence = "Available";
         sendData = new byte[64];
         try {
             this.ip = InetAddress.getByName(ip);
-            sendData = sentence.getBytes();
             this.socket = socket;
         } catch(Exception e) {
             e.printStackTrace();
@@ -26,10 +25,12 @@ class NotifyThread extends Thread {
 
     @Override
     public void run() {
-        sendPacket = new DatagramPacket(sendData,
-                    sendData.length, ip, 5555);
+        String sentence = "Available ";
         while(running) {
             try {
+                sendData   = (sentence + nr++).getBytes();
+                sendPacket = new DatagramPacket(sendData,
+                             sendData.length, ip, 5555);
                 socket.send(sendPacket);
                 Thread.sleep(5000);
             } catch(Exception e) {

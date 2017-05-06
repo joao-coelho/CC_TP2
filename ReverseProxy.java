@@ -6,7 +6,7 @@ class InfoServer {
     protected double rtt;
     protected double lossRate;
     protected int nTcpCon;
-    protected int rec, env;
+    protected int rec, env, warn;
     protected int dup, lastAck;
     protected Calendar lastProbing;
 
@@ -15,6 +15,7 @@ class InfoServer {
         lossRate = 0.0;
         nTcpCon  = 0;
         rec = env = 0;
+        warn = -1;
     }
 
     public void updateLoss() {
@@ -119,7 +120,7 @@ class Probing extends Thread {
                 System.out.println(received);
 
                 if(received.contains("Available"))
-                    sendProbing();
+                    sendProbing(received.split(" ")[1]);
                 else {
                     updateInfo(received);
                 }
@@ -129,9 +130,10 @@ class Probing extends Thread {
         }
     }
 
-    private void sendProbing() throws Exception {
+    private void sendProbing(String num) throws Exception {
         System.out.println("");
         StringBuilder env = new StringBuilder();
+        int numb = Integer.parseInt(num);
 
         if(!table.containsKey(addr)) {
             String s = "New connection: " + addr.toString();
@@ -141,6 +143,10 @@ class Probing extends Thread {
         }
         else
             backEnd = table.get(addr);
+        if(numb == backEnd.warn) {
+            backEnd.dup++;
+            return;
+        }
         Calendar c = Calendar.getInstance();
         long time = c.getTimeInMillis();
         env.append(request);
@@ -153,6 +159,7 @@ class Probing extends Thread {
         backEnd.lastProbing = c;
         backEnd.env++;
         backEnd.updateLoss();
+        backEnd.warn = numb;
         socket.send(send);
     }
 
