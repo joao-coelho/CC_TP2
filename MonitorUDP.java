@@ -43,7 +43,6 @@ class NotifyThread extends Thread {
         running = false;
         socket.close();
     }
-
 }
 
 
