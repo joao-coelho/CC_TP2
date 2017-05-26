@@ -62,18 +62,8 @@ faz com base em parâmetros dinâmicos, como por exemplo o RTT, as perdas e núm
 
 \newpage
 
-\section{Arquitetura da solução implementada}
--------------		  --------------\par
-|  Back-end |		  |            |\par
-|     (5555)|---------|            |\par
-|  apache2  |		  |            |\par
--------------		  |            |\par
-					  |Reverse (80)|-------- Clientes (wget)\par
--------------		  |	Proxy      |\par
-|  Back-end |		  |            |\par
-|     (5555)|---------|(5555)      |\par
-|  apache2  |		  |            |\par
--------------		  --------------\par
+\section{Arquitetura da solução implementada(em ambiente de teste)}
+\includegraphics[width=160mm, scale=1]{imagemArq.jpg}
 
 \newpage
 
@@ -81,7 +71,7 @@ faz com base em parâmetros dinâmicos, como por exemplo o RTT, as perdas e núm
 
 \begin{itemize}
 	\setlength\itemsep{1em}
-\item \textbf{Primitivas de comunicação:} Carrega Benfica
+\item \textbf{Primitivas de comunicação:} Sockets UDP.
 \item \textbf{Formato do PDU:} constituído pelo número do ACK do próximo pacote, que o servidor pretende receber, e pelo timestamp que permitirá calcular o RTT. Sobre o ACK, importa referir que é utilizado no cálculo do taxa de perdas e de duplicados. Já sobre o timestamp, nota para o cuidado especial que se teve para que contabilizasse apenas o tempo de deslocamento de um pacote entre servidores. Aquando da receção de um pacote, o monitor marca o momento. A esse valor temporal subtrai o timestamp recebido, obtendo assim o tempo da deslocação até si. Depois, no momento em que se prepara para enviar a resposta ao pedido de probing, volta a calcular o tempo atual, subtraindo o valor do tempo da deslocação. Assim, ao receber a resposta, o Reverse Proxy só tem de calcular o momento atual e subtrair o timestamp recebido na resposta, obtendo assim o RTT.
 \item \textbf{Interações:} Hellos de 5 em 5 segundos, com pedidos de probing smp que recebemos um estou disponivel
 \end{itemize}
@@ -96,7 +86,20 @@ detalhes, parâmetros, bibliotecas de funções, etc.
 
 \section{Testes e resultados}
 
-Usamos apache2 blah blah
+Para cenário de teste foi utilizado Apache2 em cada um dos servidores backend(dois),
+uma máquina a correr o ReverseProxy e ainda dois clientes a efetuar pedidos ao Reverse-
+Proxy. Os testes foram realizados na topologia core da unidade curricular, a máquina do
+ReverseProxy é o Servidor 1, as máquinas de backend são os portáteis 1 e 2 e por último
+os clientes que são o 1 e 2.
+Deixou-se a correr durante alguns segundos o ReverseProxy e os 2 servidores backend
+para que a tabela do ReverseProxy estabilizasse. Depois, efetuou-se o comando wget no
+Cliente 1 para o ReverseProxy obtendo o index.html do servidor backend com melhor score
+naquele instante. Verificou-se que o n o de conexões tcp(na tabela) do servidor backend
+naquele momento aumentou para 1, então testou-se um wget de cada cliente e o n o de
+conexões tcp do backend escolhido atualizou para 2. Como os pedidos dos clientes não
+foram efetuados exatamente ao mesmo tempo, também existiu a situação em que cada
+pedido foi atendido por um servidor backend diferente, ficando ambos com uma conexão
+tcp naquele momento.
 
 \newpage
 
