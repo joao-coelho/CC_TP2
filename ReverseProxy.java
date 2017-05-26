@@ -27,8 +27,9 @@ class InfoServer implements Comparable {
             lossRate = 1 - aux;
         else
             lossRate = aux - 1;
-        score  = rtt + lossRate;
-        score += nTcpCon;
+        score  = rtt + lossRate*100;
+        score += nTcpCon*2;
+        score += dup/(rec+env);
     }
 
     public int compareTo(Object o) {
@@ -133,7 +134,6 @@ class Probing extends Thread {
                 String received = new String(receive.getData(), receive.getOffset(), 
                                              receive.getLength());
                 addr = receive.getAddress();
-                System.out.println(received);
 
                 if(received.contains("Available"))
                     sendProbing(received.split(" ")[1]);
@@ -184,15 +184,17 @@ class Probing extends Thread {
     private void updateInfo(String received) throws Exception {
         String[] rec = received.split(" ");
         backEnd  = table.get(addr);
-        long i = Long.parseLong(rec[4]);
+        long i = Long.parseLong(rec[2]);
         long f = Calendar.getInstance().getTimeInMillis();
         int ac = Integer.parseInt(rec[1]);
-        backEnd.rtt = (backEnd.rtt + (f - i))/2;
-        backEnd.nTcpCon = Integer.parseInt(rec[3]);
-        if(ac == backEnd.lastAck)
+        //backEnd.nTcpCon = Integer.parseInt(rec[3]);
+        if(ac == backEnd.lastAck) {
             backEnd.dup++;
+            return;
+        }
         else 
             backEnd.rec++;
+        backEnd.rtt = (backEnd.rtt + (f - i))/2;
         backEnd.update();
         backEnd.lastAck = ac;
         printTable();
@@ -223,10 +225,11 @@ class Probing extends Thread {
         System.out.print("--------------+");
         System.out.print("--------------+");
         System.out.print("--------------+\n");
-         for(Map.Entry<InetAddress, InfoServer> entry : table.entrySet()) {
+        for(Map.Entry<InetAddress, InfoServer> entry : table.entrySet()) {
             InetAddress key  = entry.getKey();
             InfoServer value = entry.getValue();
-            System.out.printf("%15s", key.toString());
+            System.out.println("Score: " + value.score);
+            System.out.printf("%15s", key.toString().split("/")[1]);
             System.out.printf("  |  ");
             System.out.printf("%10f", value.rtt);
             System.out.printf("  |  ");
@@ -261,17 +264,23 @@ class TcpConnection extends Thread {
         double score = -1;
         try {
             InetAddress ip = InetAddress.getByName("localhost");
+            InfoServer srv = new InfoServer();
             for(Map.Entry<InetAddress, InfoServer> entry : table.entrySet()) {
                 InfoServer s = entry.getValue();
                 InetAddress i = entry.getKey();
                 if(s.score < score || score < 0) {
                     score = s.score;
                     ip = i;
+                    srv = s;
                 }
             }
+            srv.nTcpCon++;
             String str;
+            StringBuilder sb = new StringBuilder();
             String hostStr = "Host: " + ip.toString().split("/")[1];
+            System.out.println(hostStr);
             backEnd = new Socket(ip, ReverseProxy.PORT);
+            System.out.println(ip.toString());
             InputStreamReader be = new InputStreamReader(backEnd.getInputStream());
             InputStreamReader cl = new InputStreamReader(client.getInputStream());
             BufferedReader inBE  = new BufferedReader(be);
@@ -282,22 +291,25 @@ class TcpConnection extends Thread {
             while(!str.equals("")) {
                 if(str.contains("Host:"))
                     str = hostStr;
-                outBE.print(str+"\n\r");
+                outBE.println(str+"\r");
                 outBE.flush();
-                str = inCL.readLine(); 
+                str = inCL.readLine();
             }
-            outBE.print("\n\r");
+            outBE.println("\r");
             outBE.flush();
             str = inBE.readLine();
             while(str != null) {
                 outCL.println(str);
-                outCL.flush();
                 str = inBE.readLine();
             }
+            outCL.flush();
+            srv.nTcpCon--;
 
         } catch(Exception e) {}
 
+
     }
+
 }
 
 

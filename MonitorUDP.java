@@ -71,8 +71,8 @@ public class MonitorUDP {
         notifier.start();
 
         while(true) {
-            cmd.append("netstat --inet localhost --tcp | ");
-            cmd.append("grep ESTABLISHED | wc -l");
+            cmd.append("netstat | ");
+            cmd.append("grep tcp | wc -l");
             Process p = Runtime.getRuntime().exec(cmd.toString());
                 
             InputStreamReader i = new InputStreamReader(p.getInputStream());
@@ -98,14 +98,14 @@ public class MonitorUDP {
             long tnow  = Calendar.getInstance().getTimeInMillis();
             long diff  = tnow - time;
             
-            pdu.append("ACK ").append(req+1);
-            pdu.append(" #TCP: " + nTcp + " ");
+            pdu.append("ACK ").append(req+1).append(" ");
             tnow = Calendar.getInstance().getTimeInMillis();
             pdu.append(tnow - diff);
             sendData = pdu.toString().getBytes();
             send = new DatagramPacket(sendData, sendData.length, 
                                       receive.getAddress(), 5555);
             socket.send(send);
+            System.out.println("SENT: " + pdu.toString());
             pdu = new StringBuilder();
         }
     }
