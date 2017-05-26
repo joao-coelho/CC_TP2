@@ -80,8 +80,25 @@ faz com base em parâmetros dinâmicos, como por exemplo o RTT, as perdas e núm
 
 \section{Implementação}
 
-detalhes, parâmetros, bibliotecas de funções, etc.
+\begin{itemize}
+	\setlength\itemsep{1em}
+	\setlength{\parindent}{1cm}
+\item \textbf{Monitor UDP:} Cada \textit{back-end} terá associado a si um monitor implementado via UDP que monitoriza o estado da ligação com o \textit{Reverse Proxy}. O monitor envia \textit{hellos} de 5 em 5 segundos para o \textit{Reverse Proxy} e responde ao pedido de \textit{probing} por parte do servidor. Para o tratamento do envio dos \textit{hellos}, foi implementada uma thread que se dedica somente a isso.\par
+	A thread principal do monitor é a responsável por responder aos pedidos que o \textit{back-end} faz quando deseja atualizar a entrada da tabela que correponde ao presente monitor. Assim sempre que é recebido um pacote no monitor vindo do \textit{Reverse Proxy}, é recebido o número de sequência desse pacote, e a esse número é adicionado uma unidade que advém de agora o monitor estar á espera do próximo pacote. É assim enviado no PDU o número de sequência que corresponde ao próximo pacote que o monitor está á espera. É também calculado para envio do PDU um \textit{timestamp} que já foi esclarecido na secção acima.\par
+	Esta comunicação por UDP foi então implementada com o auxílio da API de \textit{DatagramPackets}.
+	
+	\item \textbf{\textit{Reverse Proxy}:} O \textit{Reverse Proxy} tem a função de selecionar um servidor \textit{back-end} para dar resposta a pedidos de clientes de forma mais rápida e efeciente.\par 
+	 Assim é necessário enviar pedidos de \textit{probing} aos \textit{back-ends} que estão ligados de forma a que a escolha do servidor seja a melhor possível. O envio e receção de \textit{probing} é assegurado por uma nova thread criada para o paralelismo dos processos. Estes pedidos são enviados logo que um \textit{hello} vindo de um monitor é recebido, ou seja de 5 em 5 segundos também. O pedido enviado é tratado pelo monitor como já foi referido no ponto anterior e depois recebido novamente pelo \textit{Reverse Proxy} que retira informação do PDU que lhe chega. Esta informação ajuda a atualizar a tabela com os dados dos monitores, como o RTT (\textit{round-trip-time}), número de pacotes duplicados e a \textit{loss rate} (percentagem de pacotes perdidos).\par 
+	O RTT é calculado através do timestamp que trás consigo o PDU. Este timestamp já conta com o deslocamento incial \textit{Reverse Proxy} --> \textit{back-end}, sendo que quando recebido agora, é somente necessário subtrair o timestamp atual pelo que veio com o PDU. A cada pacote com a resposta/pedido de \textit{probing}, são incrementados o número de pacotes enviados e o número de pacotes recebidos. Este controlo de pacotes que são enviados e recebidos, são usados para ser calculada a \textit{loss rate}. O número de pacotes duplicados são calculados com recurso ao ACK que são enviados e recebidos. Quando são recibos mais que um pacote com o mesmo ACK é incrementado número de pacotes duplicados para o monitor em questão. Toda esta informação é atualizada para a entrada da tabela correspondente a cada monitor.\par
+	O \textit{Reverse Proxy} além de tratar de toda a monitorização dos \textit{back-ends} via UDP utilizando DatagramPackets como se acabou de expôr, trata também da receção e encaminhamento de um pedido de um cliente para o melhor \textit{back-end} no momento via TCP.\par
+	Para a escolha do melhor \textit{back-end} para encaminhamento é utilizado um score, que é calculado utilizando informação presente na tabela deste. Assim para o calculo do score, o \textit{loss rate} é multiplicado por 100, o número de conexões TCP é multiplicado por 2 e o número de pacotes duplicados é dividido pelo número total de pacotes enviados e recebidos, de modo a que a \textit{loss rate} e o número de conxões TCP tenham mais significância e os duplicados não tenham tanto peso. O score é então a soma destes três parâmetros mais o RTT. A cada 5 segundos, o score é reiniciado.\par
+	A receção do pedido do cliente, o encaminhamento do pedido do cliente para o melhor \textit{back-end} disponível e a receção da resposta do \textit{back-end} são tratados numa nova thread criada para este propósito. \par
+	Finalmente, se um \textit{back-end} não mandar \textit{hellos} durante um período contíguo de 20 segundos, o \textit{Reverse Proxy} retira a entrada da tabela que é correspondente ao \textit{back-end} que nao responde. Esta funcionalidade é também tratada numa nova thread criada para este mesmo propósito.
+	
+	
+	
 
+\end{itemize}
 \newpage
 
 \section{Testes e resultados}
